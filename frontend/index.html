@@ -1,0 +1,129 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Cửa hàng Headless - Nguyễn Trọng Đại</title>
+    <style>
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #f4f4f9; margin: 0; padding: 20px; }
+        
+        .header { background-color: #e74c3c; color: white; padding: 25px; text-align: center; border-radius: 8px; margin-bottom: 30px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
+        .header h1 { margin: 0 0 10px 0; font-size: 2rem; }
+        .header h2 { margin: 0; color: #f1c40f; font-size: 1.5rem; }
+        
+        /* CSS Danh sách */
+        .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); gap: 25px; }
+        .card { background: white; padding: 20px; border-radius: 10px; box-shadow: 0 4px 8px rgba(0,0,0,0.1); text-align: center; transition: transform 0.2s; }
+        .card:hover { transform: translateY(-5px); }
+        .card h3 { color: #333; font-size: 1.2rem; margin-bottom: 10px; }
+        .price { color: #e74c3c; font-size: 1.4rem; font-weight: bold; margin: 15px 0; }
+        .btn { background-color: #3498db; color: white; border: none; padding: 10px 20px; border-radius: 5px; cursor: pointer; text-decoration: none; font-weight: bold; }
+        .btn:hover { background-color: #2980b9; }
+
+        /* CSS Màn hình chi tiết (Mặc định ẩn) */
+        #detail-view { display: none; background: white; padding: 30px; border-radius: 10px; box-shadow: 0 4px 8px rgba(0,0,0,0.1); max-width: 800px; margin: 0 auto; }
+        .back-btn { background-color: #95a5a6; margin-bottom: 20px; display: inline-block; }
+        .back-btn:hover { background-color: #7f8c8d; }
+        .detail-title { font-size: 2rem; color: #2c3e50; margin-top: 0; }
+        .detail-desc { line-height: 1.6; color: #555; border-top: 1px solid #eee; padding-top: 20px; }
+    </style>
+</head>
+<body>
+
+    <div class="header">
+        <h1>Họ và tên: Nguyễn Trọng Đại</h1>
+        <h2>MSSV: 23810310120 </h2>
+    </div>
+
+    <div id="list-view">
+        <div class="grid" id="product-container">
+            <p style="text-align: center; width: 100%; color: #7f8c8d;">Đang tải dữ liệu từ hệ thống Bagisto...</p>
+        </div>
+    </div>
+
+    <div id="detail-view">
+        <button class="btn back-btn" onclick="goBack()">← Quay lại danh sách</button>
+        <h1 class="detail-title" id="detail-name">Tên sản phẩm</h1>
+        <p class="price" id="detail-price">0 ₫</p>
+        <p><strong>Mã SP (ID):</strong> <span id="detail-id"></span></p>
+        <h3>Mô tả chi tiết:</h3>
+        <div class="detail-desc" id="detail-desc">Đang tải mô tả...</div>
+    </div>
+
+    <script>
+        const API_URL = 'http://127.0.0.1:8000/graphql';
+        
+        // ⚠️ DÁN TOKEN CỦA BẠN VÀO ĐÂY (Giữ nguyên chữ Bearer và dấu cách)
+        const TOKEN = 'Bearer eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJpc3MiOiJodHRwOi8vMTI3LjAuMC4xOjgwMDAvZ3JhcGhxbCIsImlhdCI6MTc3NTIxODAxMywiZXhwIjoxODA2NzU0MDEzLCJuYmYiOjE3NzUyMTgwMTMsImp0aSI6ImpoZ08zaXNLZUNWRHJrWUQiLCJzdWIiOiIxIiwicHJ2IjoiZGJhMjRmYmQ5OWI2MWE1MGUxYWU4ODU3NGJmMmQwZTI3M2FkZmU4NyJ9.eJSg6Snz2MKdF-GhcZ3p5Lh8Mn9sVBriiWyfoCxwZHg';
+
+        const fetchOptions = (query) => ({
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'Authorization': TOKEN },
+            body: JSON.stringify({ query: query })
+        });
+
+        // HÀM 1: LẤY DANH SÁCH SẢN PHẨM
+        function loadProducts() {
+            const query = `query { products(input: { limit: 5, page: 1 }) { data { id name price } } }`;
+            
+            fetch(API_URL, fetchOptions(query))
+            .then(res => res.json())
+            .then(result => {
+                const container = document.getElementById('product-container');
+                container.innerHTML = ''; 
+
+                if (result.errors) {
+                    container.innerHTML = `<p style="color:red;">Lỗi API: Hãy kiểm tra lại Token.</p>`;
+                    return;
+                }
+
+                const products = result.data.products.data;
+                products.forEach(product => {
+                    const formattedPrice = new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(product.price);
+                    container.innerHTML += `
+                        <div class="card">
+                            <h3>${product.name}</h3>
+                            <p class="price">${formattedPrice}</p>
+                            <button class="btn" onclick="loadProductDetail(${product.id})">Chi Tiết</button>
+                        </div>
+                    `;
+                });
+            })
+            .catch(err => console.error(err));
+        }
+
+        // HÀM 2: LẤY CHI TIẾT 1 SẢN PHẨM
+        function loadProductDetail(id) {
+            // Chuyển giao diện: Ẩn danh sách, Hiện chi tiết
+            document.getElementById('list-view').style.display = 'none';
+            document.getElementById('detail-view').style.display = 'block';
+            document.getElementById('detail-desc').innerHTML = "Đang tải dữ liệu từ API...";
+
+            // Lệnh Query lấy chi tiết theo ID
+            const query = `query { product(id: ${id}) { id name price description } }`;
+
+            fetch(API_URL, fetchOptions(query))
+            .then(res => res.json())
+            .then(result => {
+                const p = result.data.product;
+                const formattedPrice = new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(p.price);
+                
+                // Đổ dữ liệu vào HTML
+                document.getElementById('detail-name').innerText = p.name;
+                document.getElementById('detail-price').innerText = formattedPrice;
+                document.getElementById('detail-id').innerText = p.id;
+                document.getElementById('detail-desc').innerHTML = p.description || 'Sản phẩm này chưa có bài mô tả.';
+            });
+        }
+
+        // HÀM 3: QUAY LẠI MÀN HÌNH CHÍNH
+        function goBack() {
+            document.getElementById('detail-view').style.display = 'none';
+            document.getElementById('list-view').style.display = 'block';
+        }
+
+        // Chạy hàm lấy danh sách ngay khi mở trang
+        window.onload = loadProducts;
+    </script>
+</body>
+</html>
